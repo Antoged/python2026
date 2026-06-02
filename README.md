@@ -1,7 +1,5 @@
-#### About project
+# Мой репозиторий по Python
 
-description about what is there
-
-```python
-    print("hello")
-```
+### Автор
+* **Разработчик:** Гедзюн Антон Игоревич
+* **Курс:** Python разработчик (весна 2026 год)
