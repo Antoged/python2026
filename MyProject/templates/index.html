@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Конвертер файлов</title>
+  <style>
+    :root {
+      --bg      : #000;
+      --surface : #111;
+      --border  : #333;
+      --text    : #fff;
+      --muted   : #888;
+      --hover   : #222;
+    }
+    [data-theme="light"] {
+      --bg      : #fff;
+      --surface : #f5f5f5;
+      --border  : #ccc;
+      --text    : #000;
+      --muted   : #666;
+      --hover   : #eee;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family : monospace;
+      font-size   : 14px;
+      background  : var(--bg);
+      color       : var(--text);
+      min-height  : 100vh;
+    }
+
+    header {
+      display         : flex;
+      justify-content : space-between;
+      align-items     : center;
+      padding         : 12px 24px;
+      border-bottom   : 1px solid var(--border);
+    }
+
+    .logo { font-weight: bold; font-size: 15px; }
+
+    .theme-btn {
+      background  : none;
+      border      : 1px solid var(--border);
+      color       : var(--muted);
+      padding     : 4px 10px;
+      cursor      : pointer;
+      font-family : monospace;
+      font-size   : 12px;
+    }
+    .theme-btn:hover { color: var(--text); border-color: var(--text); }
+
+    main {
+      max-width  : 700px;
+      margin     : 0 auto;
+      padding    : 40px 20px;
+      display    : flex;
+      flex-direction: column;
+      gap        : 24px;
+    }
+
+    /* Drag-and-Drop */
+    .drop-zone {
+      border      : 1px dashed var(--border);
+      padding     : 48px 24px;
+      text-align  : center;
+      cursor      : pointer;
+    }
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      border-color : var(--text);
+      background   : var(--hover);
+    }
+    .drop-zone p:first-child { margin-bottom: 6px; }
+    .drop-zone .hint { color: var(--muted); font-size: 12px; }
+    #fileInput { display: none; }
+
+    /* Файл выбран */
+    .file-info {
+      display    : none;
+      border     : 1px solid var(--border);
+      padding    : 8px 12px;
+      font-size  : 12px;
+      color      : var(--muted);
+      align-items: center;
+      gap        : 8px;
+    }
+    .file-info.visible { display: flex; }
+    .file-info .fname  { flex: 1; }
+    .file-info .clear  { cursor: pointer; color: var(--text); }
+
+    /* Форматы */
+    .format-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .fmt-btn {
+      background  : none;
+      border      : 1px solid var(--border);
+      color       : var(--muted);
+      padding     : 5px 14px;
+      cursor      : pointer;
+      font-family : monospace;
+      font-size   : 12px;
+    }
+    .fmt-btn:hover  { border-color: var(--text); color: var(--text); }
+    .fmt-btn.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+    /* Кнопка конвертации */
+    .convert-btn {
+      background  : var(--text);
+      color       : var(--bg);
+      border      : none;
+      padding     : 10px 28px;
+      cursor      : pointer;
+      font-family : monospace;
+      font-size   : 13px;
+      font-weight : bold;
+      align-self  : flex-start;
+    }
+    .convert-btn:hover    { opacity: .85; }
+    .convert-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+    /* Статус */
+    .status { font-size: 12px; color: var(--muted); min-height: 1.2em; }
+
+    /* Спиннер */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display        : inline-block;
+      width          : 10px;
+      height         : 10px;
+      border         : 1px solid currentColor;
+      border-top-color: transparent;
+      border-radius  : 50%;
+      animation      : spin .6s linear infinite;
+      margin-right   : 6px;
+      vertical-align : middle;
+    }
+
+    .download-block {
+      display     : none;
+      border      : 1px solid var(--border);
+      padding     : 14px 16px;
+      align-items : center;
+      gap         : 12px;
+    }
+    .download-block.visible { display: flex; }
+
+    .download-block .dl-name {
+      flex      : 1;
+      font-size : 12px;
+      color     : var(--muted);
+      overflow  : hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Кнопка «Скачать готовый файл» */
+    .dl-btn {
+      background  : none;
+      border      : 1px solid var(--text);
+      color       : var(--text);
+      padding     : 6px 16px;
+      cursor      : pointer;
+      font-family : monospace;
+      font-size   : 12px;
+      white-space : nowrap;
+      text-decoration: none;
+      display     : inline-block;
+    }
+    .dl-btn:hover { background: var(--text); color: var(--bg); }
+
+    .cache-note {
+      font-size  : 11px;
+      color      : var(--muted);
+      border     : 1px dashed var(--border);
+      padding    : 2px 8px;
+      white-space: nowrap;
+    }
+
+    /* Таблица */
+    h2 { font-size: 13px; font-weight: bold; margin-bottom: 8px; }
+
+    .table-wrap {
+      border     : 1px solid var(--border);
+      overflow-x : auto;
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+    thead th {
+      text-align    : left;
+      padding       : 8px 12px;
+      color         : var(--muted);
+      border-bottom : 1px solid var(--border);
+      white-space   : nowrap;
+    }
+
+    tbody tr { border-bottom: 1px solid var(--border); }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--hover); }
+
+    tbody td {
+      padding      : 7px 12px;
+      white-space  : nowrap;
+      max-width    : 160px;
+      overflow     : hidden;
+      text-overflow: ellipsis;
+    }
+
+    .badge {
+      font-size  : 11px;
+      padding    : 1px 6px;
+      border     : 1px solid var(--border);
+      color      : var(--muted);
+    }
+    .badge-cache { border-style: dashed; }
+
+    /* Кнопка скачивания в строке истории */
+    .hist-dl {
+      font-size      : 11px;
+      padding        : 2px 10px;
+      border         : 1px solid var(--border);
+      color          : var(--muted);
+      text-decoration: none;
+      white-space    : nowrap;
+      display        : inline-block;
+    }
+    .hist-dl:hover          { border-color: var(--text); color: var(--text); }
+    .hist-dl.expired        { opacity: .35; pointer-events: none; cursor: default; }
+
+    .empty { padding: 20px; text-align: center; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">/ конвертер</div>
+  <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">светлая</button>
+</header>
+
+<main>
+
+  <!-- Drag-and-Drop зона -->
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <p>перетащи файл сюда</p>
+    <p class="hint">или кликни · PNG JPG WEBP MP4 DOCX XLSX</p>
+    <input type="file" id="fileInput" onchange="handleFileSelect(this.files[0])" />
+  </div>
+
+  <!-- Выбранный файл -->
+  <div class="file-info" id="fileInfo">
+    <span class="fname" id="fname">—</span>
+    <span id="fsize" style="color:var(--muted)"></span>
+    <span class="clear" onclick="clearFile()">✕</span>
+  </div>
+
+  <!-- Форматы -->
+  <div class="format-row" id="formatRow"></div>
+
+  <!-- Кнопка конвертации -->
+  <button class="convert-btn" id="convertBtn" onclick="startConvert()" disabled>
+    конвертировать
+  </button>
+
+  <!-- Статус (спиннер / ошибки) -->
+  <div class="status" id="status"></div>
+
+  <div class="download-block" id="downloadBlock">
+    <span class="dl-name" id="dlName">—</span>
+    <span class="cache-note" id="cacheNote" style="display:none">кэш</span>
+    <a class="dl-btn" id="dlLink" href="#" download>скачать готовый файл</a>
+  </div>
+
+  <!-- История за последние 24 часа -->
+  <div>
+    <h2>история (24 ч) <span id="rowCount" style="color:var(--muted);font-weight:normal">(0)</span></h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>файл</th>
+            <th>формат</th>
+            <th>дата</th>
+            <th>истекает</th>
+            <th>скачать</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  var selectedFile   = null;
+  var selectedFormat = null;
+
+  var FORMAT_MAP = {
+    "image/png"  : ["jpg", "webp"],
+    "image/jpeg" : ["png", "webp"],
+    "image/webp" : ["jpg", "png"],
+    "image/bmp"  : ["jpg", "png", "webp"],
+    "image/gif"  : ["jpg", "png", "webp"],
+    "video/mp4"  : ["mp3"],
+    ".docx": ["pdf"], ".doc": ["pdf"],
+    ".xlsx": ["pdf"], ".xls": ["pdf"]
+  };
+
+  function getFormats(file) {
+    if (FORMAT_MAP[file.type]) return FORMAT_MAP[file.type];
+    var ext = "." + file.name.split(".").pop().toLowerCase();
+    return FORMAT_MAP[ext] || [];
+  }
+
+  function renderFormatButtons(formats) {
+    var row = document.getElementById("formatRow");
+    row.innerHTML = "";
+    selectedFormat = null;
+    document.getElementById("convertBtn").disabled = true;
+    hideDownloadBlock();
+
+    if (!formats.length) {
+      row.innerHTML = "<span style='color:var(--muted)'>формат не поддерживается</span>";
+      return;
+    }
+
+    formats.forEach(function(fmt) {
+      var btn = document.createElement("button");
+      btn.className   = "fmt-btn";
+      btn.textContent = fmt;
+      btn.addEventListener("click", function(e) {
+        e.stopPropagation();
+        document.querySelectorAll(".fmt-btn").forEach(function(b) { b.classList.remove("active"); });
+        btn.classList.add("active");
+        selectedFormat = fmt;
+        document.getElementById("convertBtn").disabled = false;
+        hideDownloadBlock();
+      });
+      row.appendChild(btn);
+    });
+  }
+
+  // ── Drag-and-Drop ──────────────────────────────────────────────────────────
+  var dz = document.getElementById("dropZone");
+  ["dragenter","dragover","dragleave","drop"].forEach(function(ev) {
+    dz.addEventListener(ev, function(e) { e.preventDefault(); e.stopPropagation(); });
+    document.body.addEventListener(ev, function(e) { e.preventDefault(); });
+  });
+  dz.addEventListener("dragenter", function() { dz.classList.add("dragover"); });
+  dz.addEventListener("dragleave", function() { dz.classList.remove("dragover"); });
+  dz.addEventListener("drop", function(e) {
+    dz.classList.remove("dragover");
+    if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]);
+  });
+
+  function handleFileSelect(file) {
+    if (!file) return;
+    selectedFile = file;
+    document.getElementById("fname").textContent = file.name;
+    document.getElementById("fsize").textContent = fmtSize(file.size);
+    document.getElementById("fileInfo").classList.add("visible");
+    renderFormatButtons(getFormats(file));
+    setStatus("");
+  }
+
+  function clearFile() {
+    selectedFile = selectedFormat = null;
+    document.getElementById("fileInfo").classList.remove("visible");
+    document.getElementById("fileInput").value = "";
+    document.getElementById("formatRow").innerHTML = "";
+    document.getElementById("convertBtn").disabled = true;
+    setStatus("");
+    hideDownloadBlock();
+  }
+
+  function fmtSize(b) {
+    if (b < 1024)    return b + " B";
+    if (b < 1048576) return (b/1024).toFixed(1) + " KB";
+    return (b/1048576).toFixed(1) + " MB";
+  }
+
+  // ── Показать / скрыть блок скачивания ─────────────────────────────────────
+
+  function showDownloadBlock(token, filename, cacheHit) {
+    var url = "/download/" + encodeURIComponent(token) +
+              "?filename=" + encodeURIComponent(filename);
+
+    var link = document.getElementById("dlLink");
+    link.href             = url;
+    link.setAttribute("download", filename);
+
+    document.getElementById("dlName").textContent = filename;
+
+    var note = document.getElementById("cacheNote");
+    note.style.display = cacheHit ? "inline" : "none";
+
+    document.getElementById("downloadBlock").classList.add("visible");
+  }
+
+  function hideDownloadBlock() {
+    document.getElementById("downloadBlock").classList.remove("visible");
+    document.getElementById("dlLink").href = "#";
+  }
+
+  // ── Конвертация ────────────────────────────────────────────────────────────
+
+  function startConvert() {
+    if (!selectedFile || !selectedFormat) return;
+
+    var btn = document.getElementById("convertBtn");
+    btn.disabled = true;
+    hideDownloadBlock();
+    setStatus('<span class="spinner"></span>конвертирую…');
+
+    var reader = new FileReader();
+
+    reader.onerror = function() {
+      setStatus("ошибка чтения файла");
+      btn.disabled = false;
+    };
+
+    reader.onload = function(e) {
+      var arrayBuf = e.target.result;
+      var boundary = "----Boundary" + Math.random().toString(36).slice(2);
+      var enc      = new TextEncoder();
+
+      var part1 = enc.encode(
+        "--" + boundary + "\r\n" +
+        "Content-Disposition: form-data; name=\"target_fmt\"\r\n\r\n" +
+        selectedFormat + "\r\n"
+      );
+      var mime = selectedFile.type || "application/octet-stream";
+      var part2head = enc.encode(
+        "--" + boundary + "\r\n" +
+        "Content-Disposition: form-data; name=\"file\"; filename=\"" + selectedFile.name + "\"\r\n" +
+        "Content-Type: " + mime + "\r\n\r\n"
+      );
+      var part2tail = enc.encode("\r\n");
+      var ending    = enc.encode("--" + boundary + "--\r\n");
+
+      var body = new Blob([part1, part2head, new Uint8Array(arrayBuf), part2tail, ending]);
+
+      var xhr = new XMLHttpRequest();
+      xhr.open("POST", "/convert", true);
+      xhr.setRequestHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
+      xhr.responseType = "text";
+
+      xhr.onload = function() {
+        btn.disabled = false;
+
+        var data;
+        try { data = JSON.parse(xhr.responseText); }
+        catch(err) { setStatus("ошибка разбора ответа сервера"); return; }
+
+        if (xhr.status !== 200) {
+          setStatus("ошибка: " + (data.error || xhr.status));
+          return;
+        }
+
+        var label = data.cache_hit
+          ? "готово (из кэша) — нажмите кнопку для скачивания"
+          : "готово — нажмите кнопку для скачивания";
+        setStatus(label);
+
+        showDownloadBlock(data.token, data.filename, data.cache_hit);
+        loadHistory();
+      };
+
+      xhr.onerror = function() {
+        setStatus("сетевая ошибка — сервер недоступен");
+        btn.disabled = false;
+      };
+
+      xhr.send(body);
+    };
+
+    reader.readAsArrayBuffer(selectedFile);
+  }
+
+  function setStatus(html) {
+    document.getElementById("status").innerHTML = html;
+  }
+
+  // ── История ────────────────────────────────────────────────────────────────
+
+  function loadHistory() {
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/history", true);
+    xhr.onload = function() {
+      if (xhr.status !== 200) return;
+      try {
+        var rows = JSON.parse(xhr.responseText);
+        document.getElementById("rowCount").textContent = "(" + rows.length + ")";
+        var tbody = document.getElementById("historyBody");
+
+        if (!rows.length) {
+          tbody.innerHTML = "<tr><td colspan='6' class='empty'>нет записей за последние 24 часа</td></tr>";
+          return;
+        }
+
+        var now = new Date();
+
+        tbody.innerHTML = rows.map(function(r) {
+          var alive    = new Date(r.expires_at) > now;
+          var dlUrl    = "/download/" + encodeURIComponent(r.out_file) +
+                         "?filename="  + encodeURIComponent(makeDownloadName(r.orig_name, r.target_fmt));
+          var dlCell   = alive
+            ? "<a class='hist-dl' href='" + dlUrl + "' download='" + esc(makeDownloadName(r.orig_name, r.target_fmt)) + "'>↓ скачать</a>"
+            : "<span class='hist-dl expired'>истёк</span>";
+
+          return "<tr>" +
+            "<td style='color:var(--muted)'>" + r.id + "</td>" +
+            "<td title='" + esc(r.orig_name) + "'>" + trunc(r.orig_name, 20) + "</td>" +
+            "<td>" + r.target_fmt + "</td>" +
+
+            "<td style='color:var(--muted)'>" + fmtDate(r.created_at) + "</td>" +
+            "<td style='color:var(--muted)'>" + fmtDate(r.expires_at) + "</td>" +
+            "<td>" + dlCell + "</td>" +
+          "</tr>";
+        }).join("");
+      } catch(e) {}
+    };
+    xhr.send();
+  }
+
+  // Экранирование HTML-спецсимволов в атрибутах
+  function esc(s) {
+    return s.replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+  }
+
+  // Строит имя скачиваемого файла: "photo.png" + "jpg" → "photo.jpg"
+  function makeDownloadName(origName, fmt) {
+    var base = origName.lastIndexOf(".") > 0
+      ? origName.slice(0, origName.lastIndexOf("."))
+      : origName;
+    return base + "." + fmt;
+  }
+
+  function trunc(s, n) {
+    return s.length > n ? s.slice(0, n) + "…" : s;
+  }
+
+  function fmtDate(iso) {
+    try {
+      return new Date(iso).toLocaleString("ru-RU", {
+        day:"2-digit", month:"2-digit", year:"numeric",
+        hour:"2-digit", minute:"2-digit"
+      });
+    } catch(e) { return iso; }
+  }
+
+  // ── Тема ───────────────────────────────────────────────────────────────────
+
+  function toggleTheme() {
+    var html  = document.documentElement;
+    var isDark = html.getAttribute("data-theme") === "dark";
+    html.setAttribute("data-theme", isDark ? "light" : "dark");
+    document.getElementById("themeBtn").textContent = isDark ? "тёмная" : "светлая";
+    localStorage.setItem("theme", isDark ? "light" : "dark");
+  }
+
+  // ── Инициализация ──────────────────────────────────────────────────────────
+
+  (function init() {
+    var saved = localStorage.getItem("theme");
+    if (saved) {
+      document.documentElement.setAttribute("data-theme", saved);
+      document.getElementById("themeBtn").textContent = saved === "light" ? "тёмная" : "светлая";
+    }
+    loadHistory();
+    setInterval(function() { if (!document.hidden) loadHistory(); }, 15000);
+  })();
+</script>
+</body>
+</html>

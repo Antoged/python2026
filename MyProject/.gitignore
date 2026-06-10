@@ -1,0 +1,6 @@
+uploads/
+outputs/
+conversions.db
+__pycache__/
+*.pyc
+venv/
